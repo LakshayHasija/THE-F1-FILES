@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.Python
+build/
+dist/
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Environment variables / secrets
+.env
+*.key
+
+# Data (raw Kaggle CSVs are large — don't commit; document how to get them instead)
+data/raw/*.csv
+data/processed/*.db
+data/processed/*.sqlite
+
+# Vector store
+data/vector_store/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

@@ -1,0 +1,21 @@
+# Data layer
+pandas
+sqlalchemy
+
+# MCP
+fastmcp
+
+# RAG
+langchain
+langchain-google-genai
+chromadb
+sentence-transformers
+
+# Agent orchestration
+google-generativeai
+
+# UI
+streamlit
+
+# Utilities
+python-dotenv
