@@ -17,11 +17,13 @@ env/
 
 # Data (raw Kaggle CSVs are large — don't commit; document how to get them instead)
 data/raw/*.csv
+data/f1.db
 data/processed/*.db
 data/processed/*.sqlite
 
 # Vector store
 data/vector_store/
+data/chroma_db/
 
 # Jupyter
 .ipynb_checkpoints/
