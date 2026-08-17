@@ -19,7 +19,6 @@ Usage:
 """
 
 from langchain_core.documents import Document
-
 from data_access import (
     get_all_drivers,
     get_driver_career_summary,
@@ -46,6 +45,7 @@ def build_driver_documents():
 
         documents.append(
             Document(
+                id=f"driver_{driver['driverId']}",
                 page_content=text,
                 metadata={
                     "doc_type": "driver",
@@ -87,8 +87,8 @@ def _summarize_race(year, round_):
 
     return text
 
-def build_race_documents(start_year=2015):
-    """One Document per race, from start_year to the most recent season."""
+def build_race_documents(start_year = 1950):
+    """One Document per race, from start_year (1950 = full history) onward."""
     documents = []
 
     for race in get_races_since(start_year):
@@ -98,6 +98,7 @@ def build_race_documents(start_year=2015):
 
         documents.append(
             Document(
+                id=f"race_{race['year']}_{race['round']}",
                 page_content=text,
                 metadata={
                     "doc_type": "race",
@@ -117,6 +118,6 @@ if __name__ == "__main__":
     print(drivers[0].metadata)
 
     races = build_race_documents(start_year=2023)
-    print(f"\nBuilt {len(races)} race documents (2023+). Sample:\n")
+    print(f"\nBuilt {len(races)} race documents (2023+ sample). Sample:\n")
     print(races[0].page_content)
     print(races[0].metadata)

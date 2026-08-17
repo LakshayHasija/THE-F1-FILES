@@ -31,10 +31,13 @@ CHROMA_DIR = PROJECT_ROOT / "data" / "chroma_db"
 
 EMBEDDING_PROVIDER = "local"  # "local" or "gemini" — flip this when ready
 
-# Lightweight, fast, good enough for a portfolio RAG demo (~80MB download,
-# cached locally after the first run — no internet needed after that).
-# "sentence-transformers/all-mpnet-base-v2" is a slower, higher-quality
-# alternative if retrieval quality ever feels lacking.
+# Tested all-mpnet-base-v2 (768-dim, ~420MB) against this same query set —
+# it did NOT meaningfully improve retrieval quality (see git history /
+# progress log). The bottleneck turned out to be near-identical sentence
+# templates across driver docs causing name-token overlap to dominate,
+# not embedding model capacity. MiniLM is 5x smaller and faster for the
+# same result, so that's what's staying — revisit if doc templates get
+# diversified later, not by upgrading the model again.
 LOCAL_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
 # text-embedding-004 is stable and free-tier friendly, for when you
@@ -60,13 +63,25 @@ def get_embeddings():
     )
 
 
+def _collection_name():
+    """
+    Key the Chroma collection on provider AND model, not just provider —
+    different models produce vectors of different dimensions (MiniLM:
+    384, mpnet: 768, Gemini text-embedding-004: 768 but a different
+    space entirely). Mixing any of these in one collection breaks
+    similarity search silently or errors on dimension mismatch. Each
+    distinct model gets its own collection instead.
+    """
+    model_id = GEMINI_MODEL_NAME if EMBEDDING_PROVIDER == "gemini" else LOCAL_MODEL_NAME
+    model_slug = model_id.split("/")[-1].replace("-", "_").replace(".", "_")
+    return f"f1_files_{EMBEDDING_PROVIDER}_{model_slug}"
+
 def get_vector_store(embeddings):
     return Chroma(
-        collection_name=f"f1_files_{EMBEDDING_PROVIDER}",
+        collection_name=_collection_name(),
         embedding_function=embeddings,
         persist_directory=str(CHROMA_DIR),
     )
-
 
 def embed_in_batches(vector_store, documents, batch_size = BATCH_SIZE):
     """
@@ -91,10 +106,28 @@ def embed_in_batches(vector_store, documents, batch_size = BATCH_SIZE):
                     time.sleep(wait)
         time.sleep(BATCH_DELAY_SECONDS)
 
-def build_and_persist(start_year = 2023):
-    """Build the corpus, embed it, and persist to data/chroma_db."""
+def build_and_persist(start_year = 1950):
+    """
+    Build the corpus, embed it, and persist to data/chroma_db.
+
+    Always does a full rebuild of the collection first. The corpus is
+    fully regenerable from SQLite, and Chroma doesn't reliably dedupe
+    re-added documents even with matching IDs (see langchain-chroma
+    issue #24005) — so treating every run as append-only would silently
+    duplicate entries on re-runs. Clean slate each time avoids that
+    entirely, at the cost of always re-embedding everything (fine at
+    this corpus size on a local model — no API cost either way).
+    """
     embeddings = get_embeddings()
     vector_store = get_vector_store(embeddings)
+
+    try:
+        vector_store.delete_collection()
+        print(f"Cleared existing collection: {_collection_name()}")
+    except Exception:
+        pass
+    
+    vector_store = get_vector_store(embeddings)  # fresh, empty collection
 
     driver_docs = build_driver_documents()
     race_docs = build_race_documents(start_year=start_year)
@@ -110,7 +143,7 @@ def build_and_persist(start_year = 2023):
 
 
 if __name__ == "__main__":
-    store = build_and_persist(start_year=2023)
+    store = build_and_persist(start_year=1950)
 
     for query in [
         "Which driver dominated the 2023 season?",
