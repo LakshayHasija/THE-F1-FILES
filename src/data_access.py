@@ -63,9 +63,6 @@ def get_constructor_standings(year):
         rows = conn.execute(query, (year,)).fetchall()
     return _rows_to_dicts(rows)
 
-# ---------------------------------------------------------------------
-# Race-level
-# ---------------------------------------------------------------------
 
 def get_race_calendar(year):
     """All races in a season, in round order."""
@@ -116,10 +113,6 @@ def get_qualifying_results(year, round_):
         rows = conn.execute(query, (year, round_)).fetchall()
     return _rows_to_dicts(rows)
 
-# ---------------------------------------------------------------------
-# Driver-level
-# ---------------------------------------------------------------------
-
 def search_driver(name_fragment):
     """Fuzzy search drivers by surname or forename fragment."""
     query = """
@@ -148,6 +141,42 @@ def get_driver_career_summary(driver_id):
     """
     with _connect() as conn:
         row = conn.execute(query, (driver_id,)).fetchone()
+    return dict(row) if row else {}
+
+def get_all_drivers():
+    """Every driver's basic bio fields, for corpus building."""
+    query = """
+        SELECT driverId, forename, surname, nationality, dob
+        FROM drivers
+        ORDER BY driverId ASC;
+    """
+    with _connect() as conn:
+        rows = conn.execute(query).fetchall()
+    return _rows_to_dicts(rows)
+
+def get_races_since(start_year):
+    """(year, round) pairs for every race from start_year onward."""
+    query = """
+        SELECT year, round
+        FROM races
+        WHERE year >= ?
+        ORDER BY year ASC, round ASC;
+    """
+    with _connect() as conn:
+        rows = conn.execute(query, (start_year,)).fetchall()
+    return _rows_to_dicts(rows)
+
+def get_race_info(year, round_):
+    """Race metadata for narrative text: name, date, circuit, location."""
+    query = """
+        SELECT r.name AS race_name, r.date,
+               c.name AS circuit_name, c.location, c.country
+        FROM races r
+        JOIN circuits c ON r.circuitId = c.circuitId
+        WHERE r.year = ? AND r.round = ?;
+    """
+    with _connect() as conn:
+        row = conn.execute(query, (year, round_)).fetchone()
     return dict(row) if row else {}
 
 if __name__ == "__main__":
