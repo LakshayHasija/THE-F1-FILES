@@ -20,11 +20,9 @@ Usage:
 
 import time
 from pathlib import Path
-
 from langchain_chroma import Chroma
 from langchain_core.embeddings import Embeddings
-
-from rag_documents import build_driver_documents, build_race_documents
+from rag_documents import build_driver_documents, build_race_documents, build_season_documents
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CHROMA_DIR = PROJECT_ROOT / "data" / "chroma_db"
@@ -48,6 +46,7 @@ BATCH_SIZE = 50
 MAX_RETRIES = 3
 # No point pausing between batches for a local model — nothing to rate-limit.
 BATCH_DELAY_SECONDS = 1 if EMBEDDING_PROVIDER != "local" else 0
+
 
 def get_embeddings():
     """Return an Embeddings instance for the configured provider."""
@@ -76,12 +75,14 @@ def _collection_name():
     model_slug = model_id.split("/")[-1].replace("-", "_").replace(".", "_")
     return f"f1_files_{EMBEDDING_PROVIDER}_{model_slug}"
 
+
 def get_vector_store(embeddings):
     return Chroma(
         collection_name=_collection_name(),
         embedding_function=embeddings,
         persist_directory=str(CHROMA_DIR),
     )
+
 
 def embed_in_batches(vector_store, documents, batch_size = BATCH_SIZE):
     """
@@ -106,6 +107,7 @@ def embed_in_batches(vector_store, documents, batch_size = BATCH_SIZE):
                     time.sleep(wait)
         time.sleep(BATCH_DELAY_SECONDS)
 
+
 def build_and_persist(start_year = 1950):
     """
     Build the corpus, embed it, and persist to data/chroma_db.
@@ -125,17 +127,19 @@ def build_and_persist(start_year = 1950):
         vector_store.delete_collection()
         print(f"Cleared existing collection: {_collection_name()}")
     except Exception:
-        pass
-    
+        pass  # collection didn't exist yet — nothing to clear
+
     vector_store = get_vector_store(embeddings)  # fresh, empty collection
 
     driver_docs = build_driver_documents()
     race_docs = build_race_documents(start_year=start_year)
-    all_docs = driver_docs + race_docs
+    season_docs = build_season_documents(start_year=start_year)
+    all_docs = driver_docs + race_docs + season_docs
 
     print(
         f"Embedding {len(driver_docs)} driver docs + {len(race_docs)} race "
-        f"docs ({start_year}+) = {len(all_docs)} total..."
+        f"docs + {len(season_docs)} season docs ({start_year}+) = "
+        f"{len(all_docs)} total..."
     )
     embed_in_batches(vector_store, all_docs)
     print(f"Done. Persisted to {CHROMA_DIR}")

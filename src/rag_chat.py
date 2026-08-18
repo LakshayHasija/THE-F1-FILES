@@ -22,26 +22,34 @@ from langchain_groq import ChatGroq
 from rag_embed import get_embeddings, get_vector_store
 
 # Check console.groq.com/docs/models for the current lineup if this gets
-# retired — openai/gpt-oss-120b is a solid, free-tier text model as
-# of writing. Groq's free tier is rate-limited, not credit-metered.
+# retired. gpt-oss-120b is OpenAI's flagship open-weight model, hosted
+# on Groq's fast inference — strong reasoning benchmarks, free tier
+# available (rate-limited, not credit-metered). Swap to "openai/gpt-oss-20b"
+# if you hit rate limits and want a faster/lighter fallback.
 GROQ_MODEL = "openai/gpt-oss-120b"
 TOP_K = 5
 
 SYSTEM_PROMPT = (
     "You are an assistant answering questions about Formula 1 history, "
     "using only the context provided below. The context comes from a "
-    "database of driver career summaries (full history) and race result "
-    "summaries (2023 season onward only).\n\n"
+    "database with three document types: driver career summaries (full "
+    "history), season championship standings (drivers' and constructors' "
+    "titles, per year), and individual race result summaries (winner, "
+    "podium, notable retirements).\n\n"
     "Rules:\n"
     "- Answer only using the provided context. Do not use outside "
     "knowledge, even if you're confident about it — the corpus may be "
     "incomplete or the person may be testing what you actually retrieved.\n"
+    "- For championship/title questions, prefer season-standings "
+    "documents over inferring from individual race wins — race wins "
+    "alone don't determine the champion (points from podiums matter too).\n"
     "- If the context doesn't contain enough information to answer, say "
     "so plainly rather than guessing.\n"
     "- Retrieved context sometimes includes irrelevant documents — ignore "
     "them rather than forcing them into your answer.\n"
     "- Be concise and specific (names, numbers), not vague."
 )
+
 
 def get_llm():
     return ChatGroq(model=GROQ_MODEL, temperature=0)
@@ -75,15 +83,25 @@ def ask(question, k = TOP_K):
         "sources": docs,
     }
 
+def _source_tag(doc):
+    """Human-readable label for a retrieved source, by doc type."""
+    meta = doc.metadata
+    doc_type = meta.get("doc_type")
+    if doc_type == "driver":
+        return meta.get("driver_name", "unknown driver")
+    if doc_type == "season":
+        return f"{meta.get('year')} season"
+    if doc_type == "race":
+        return f"{meta.get('year')} R{meta.get('round')}"
+    return "unknown source"
+
 
 def _print_result(result):
     print(f"\nQ: {result['question']}")
     print(f"A: {result['answer']}")
     print(f"\n  ({len(result['sources'])} source(s) retrieved)")
     for doc in result["sources"]:
-        meta = doc.metadata
-        tag = meta.get("driver_name") or f"{meta.get('year')} R{meta.get('round')}"
-        print(f"   - [{meta.get('doc_type')}] {tag}")
+        print(f"   - [{doc.metadata.get('doc_type')}] {_source_tag(doc)}")
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:

@@ -1,18 +1,21 @@
 """
-THE-F1-FILES — Day 5: RAG corpus builder
+THE-F1-FILES — RAG corpus builder
 
 The Ergast dataset is entirely relational (IDs, foreign keys, numbers) —
 there's no prose to embed. This module manufactures the text corpus by
 turning rows into readable paragraphs, since semantic search is only as
-good as the text you feed it. Two document types for now:
+good as the text you feed it. Three document types:
 
   - Driver documents: one paragraph per driver's career.
   - Race documents:   one paragraph per race (winner, podium, notable
                        retirements), for races from `start_year` onward.
-
-Race documents are windowed by year (not all 1,125 races) to keep the
-initial corpus a manageable size for embedding — widen the window once
-this is working end to end.
+  - Season documents: one paragraph per season's final championship
+                       standings (drivers' and constructors' titles).
+                       Added after discovering the model correctly
+                       refused to answer "who won the 1994 title" from
+                       individual race documents alone — race wins
+                       aren't the same as championship points, and
+                       there was no season-level document to retrieve.
 
 Usage:
     python src/rag_documents.py          # prints a few sample docs
@@ -22,10 +25,13 @@ from langchain_core.documents import Document
 from data_access import (
     get_all_drivers,
     get_driver_career_summary,
+    get_driver_standings,
+    get_constructor_standings,
     get_races_since,
     get_race_info,
     get_race_results,
 )
+
 
 def build_driver_documents():
     """One Document per driver who has at least one race on record."""
@@ -33,7 +39,8 @@ def build_driver_documents():
     for driver in get_all_drivers():
         summary = get_driver_career_summary(driver["driverId"])
         if not summary or not summary.get("races"):
-            continue
+            continue  # no results on record — nothing to say
+
         text = (
             f"{driver['forename']} {driver['surname']} is a "
             f"{driver['nationality']} Formula 1 driver, born {driver['dob']}. "
@@ -111,6 +118,69 @@ def build_race_documents(start_year = 1950):
     return documents
 
 
+def _summarize_season(year):
+    """Build one narrative paragraph for a season's final standings."""
+    driver_standings = get_driver_standings(year)
+    if not driver_standings:
+        return None
+
+    champion = driver_standings[0]
+    runner_up = driver_standings[1] if len(driver_standings) > 1 else None
+    third = driver_standings[2] if len(driver_standings) > 2 else None
+
+    text = (
+        f"In the {year} Formula 1 World Championship season, "
+        f"{champion['driver']} ({champion['constructor']}) won the "
+        f"Drivers' Championship with {champion['points']} points and "
+        f"{champion['wins']} race win(s)."
+    )
+    if runner_up:
+        text += (
+            f" {runner_up['driver']} finished second with "
+            f"{runner_up['points']} points."
+        )
+    if third:
+        text += (
+            f" {third['driver']} finished third with "
+            f"{third['points']} points."
+        )
+
+    # Constructors' Championship wasn't awarded until 1958 — Ergast has
+    # no constructor_standings rows before that, so this is skipped
+    # gracefully for early seasons rather than fabricating a sentence.
+    constructor_standings = get_constructor_standings(year)
+    if constructor_standings:
+        constructor_champion = constructor_standings[0]
+        text += (
+            f" The Constructors' Championship was won by "
+            f"{constructor_champion['constructor']} with "
+            f"{constructor_champion['points']} points."
+        )
+
+    return text
+
+
+def build_season_documents(start_year = 1950):
+    """One Document per season, summarizing final championship standings."""
+    documents = []
+    years = sorted({race["year"] for race in get_races_since(start_year)})
+
+    for year in years:
+        text = _summarize_season(year)
+        if text is None:
+            continue
+
+        documents.append(
+            Document(
+                id=f"season_{year}",
+                page_content=text,
+                metadata={"doc_type": "season", "year": year},
+            )
+        )
+
+    return documents
+
+
 if __name__ == "__main__":
     drivers = build_driver_documents()
     print(f"Built {len(drivers)} driver documents. Sample:\n")
@@ -121,3 +191,8 @@ if __name__ == "__main__":
     print(f"\nBuilt {len(races)} race documents (2023+ sample). Sample:\n")
     print(races[0].page_content)
     print(races[0].metadata)
+
+    seasons = build_season_documents(start_year=1994)
+    print(f"\nBuilt {len(seasons)} season documents (1994+ sample). Sample:\n")
+    print(seasons[0].page_content)
+    print(seasons[0].metadata)
