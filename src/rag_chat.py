@@ -54,13 +54,34 @@ SYSTEM_PROMPT = (
 def get_llm():
     return ChatGroq(model=GROQ_MODEL, temperature=0)
 
+# Cached lazily and reused across calls. Fine for the CLI (one call per
+# process anyway), but matters once this runs inside the long-lived MCP
+# server (src/mcp_server.py) — without caching, every question would
+# reload the embedding model and reopen the vector store from scratch.
+_embeddings = None
+_vector_store = None
+_llm = None
+
+
+def _cached_vector_store():
+    global _embeddings, _vector_store
+    if _vector_store is None:
+        _embeddings = get_embeddings()
+        _vector_store = get_vector_store(_embeddings)
+    return _vector_store
+
+
+def _cached_llm():
+    global _llm
+    if _llm is None:
+        _llm = get_llm()
+    return _llm
+
 def retrieve(question, k = TOP_K):
-    embeddings = get_embeddings()
-    vector_store = get_vector_store(embeddings)
-    return vector_store.similarity_search(question, k=k)
+    return _cached_vector_store().similarity_search(question, k=k)
 
 def ask(question, k = TOP_K):
-    """Retrieve context, ask Grok, return the answer plus sources used."""
+    """Retrieve context, ask Groq, return the answer plus sources used."""
     docs = retrieve(question, k=k)
     context = "\n\n".join(
         f"[{doc.metadata.get('doc_type', 'unknown')}] {doc.page_content}"
@@ -69,8 +90,7 @@ def ask(question, k = TOP_K):
 
     user_prompt = f"Context:\n{context}\n\nQuestion: {question}"
 
-    llm = get_llm()
-    response = llm.invoke(
+    response = _cached_llm().invoke(
         [
             ("system", SYSTEM_PROMPT),
             ("human", user_prompt),
@@ -82,6 +102,7 @@ def ask(question, k = TOP_K):
         "answer": response.content,
         "sources": docs,
     }
+
 
 def _source_tag(doc):
     """Human-readable label for a retrieved source, by doc type."""

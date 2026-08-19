@@ -40,6 +40,14 @@ async def main():
         )
         inspect("race_results(2023, 1)", result)
         print(f"  -> top 3: {result.data['results'][:3]}")
+        # This one calls Groq + the local embedding model, so it's slower
+        # than the structured tools above — that's expected, not a hang.
+        result = await client.call_tool(
+            "ask_f1_question", {"question": "Who won the 1994 F1 championship?"}
+        )
+        inspect("ask_f1_question('Who won the 1994 F1 championship?')", result)
+        print(f"  -> answer: {result.data['answer']}")
+        print(f"  -> {len(result.data['sources'])} source(s) used")
 
 if __name__ == "__main__":
     asyncio.run(main())

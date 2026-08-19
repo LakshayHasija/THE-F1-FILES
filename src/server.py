@@ -1,10 +1,18 @@
 """
-THE-F1-FILES — Day 4: MCP Server
+THE-F1-FILES — MCP Server
 
-Wraps src/data_access.py functions as MCP tools using FastMCP.
+Wraps two things as MCP tools:
+  - src/data_access.py functions: precise, structured lookups straight
+    from SQLite (exact standings, exact race classifications).
+  - src/rag_chat.py's ask(): semantic search + LLM synthesis over the
+    embedded corpus, for open-ended/narrative questions a structured
+    query can't answer directly.
+
 Type hints generate the JSON schema an LLM client sees; docstrings
 become the tool descriptions — so both need to be precise, not just
-correct for a human reader.
+correct for a human reader. Each tool's docstring below also signals
+*when* to prefer it over the others, since an LLM host choosing between
+7 structured tools and 1 RAG tool needs that distinction to pick well.
 
 Usage:
     python src/mcp_server.py
@@ -19,10 +27,11 @@ from data_access import (
     search_driver,
     get_driver_career_summary,
 )
+from rag_chat import ask as rag_ask
 mcp = FastMCP("F1 Files")
 
 @mcp.tool()
-def driver_standings(year):
+def driver_standings(year: int) -> dict:
     """
     Get final (or current) F1 driver championship standings for a season.
     Args:
@@ -114,6 +123,48 @@ def driver_career_summary(driver_id):
         Dict with driver name, races, wins, podiums, total_points.
     """
     return get_driver_career_summary(driver_id)
+
+@mcp.tool()
+def ask_f1_question(question):
+    """
+    Answer an open-ended, natural-language question about F1 history
+    using semantic search over an embedded corpus (driver careers,
+    season championships, race narratives from 1950-2024), with the
+    answer grounded strictly in retrieved context — not general
+    knowledge, so it will say "I don't know" rather than guess if the
+    corpus doesn't cover something.
+
+    Prefer this tool for questions like "who dominated the 2023 season",
+    "tell me about a driver's career", or "who won the 1994 title" —
+    narrative or synthesis questions without one exact structured answer.
+
+    For questions with one precise correct value — an exact standings
+    table, an exact race classification, a specific lap time — prefer
+    the structured tools instead (driver_standings, race_results,
+    qualifying_results, etc.). Those return exact database values;
+    this tool returns an LLM's synthesis of retrieved text, which is
+    more flexible but less precise.
+
+    Args:
+        question: A natural-language question about F1 history.
+
+    Returns:
+        Dict with `answer` (the generated response) and `sources`
+        (the retrieved documents it was grounded in — doc_type, the
+        underlying text, and identifying metadata — so the answer can
+        be checked against what was actually retrieved).
+    """
+    result = rag_ask(question)
+    sources = [
+        {
+            "doc_type": doc.metadata.get("doc_type"),
+            "metadata": doc.metadata,
+            "content": doc.page_content,
+        }
+        for doc in result["sources"]
+    ]
+    return {"answer": result["answer"], "sources": sources}
+
 
 if __name__ == "__main__":
     mcp.run()
