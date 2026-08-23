@@ -11,3 +11,14 @@ dependencies = [
     "langchain-chroma",
     "sentence-transformers",
 ]
+
+# Test-only config — doesn't affect the packaged extension. uv (used by
+# the .mcpb build) only reads [project].dependencies above; it ignores
+# this section entirely.
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: requires GROQ_API_KEY and network access; skipped by default",
+]
