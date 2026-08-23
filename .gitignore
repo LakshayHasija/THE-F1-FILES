@@ -38,3 +38,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Packaged extension build output — regenerate with: mcpb pack . f1-files.mcpb
+*.mcpb

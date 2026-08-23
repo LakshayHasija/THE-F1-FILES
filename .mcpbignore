@@ -1,0 +1,22 @@
+# Local dev environment — the uv server type doesn't bundle a venv anyway
+venv/
+.venv/
+
+# Generated data — deliberately NOT bundled. The extension is configured
+# to point at these via the data_directory user_config setting instead,
+# so the bundle stays small and doesn't duplicate multi-GB regenerable
+# files (see data_access.py / rag_embed.py's F1_FILES_DATA_DIR override).
+data/
+
+# Python cruft
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Version control / secrets / misc
+.git/
+.gitignore
+.env
+*.log
+.vscode/
+.idea/

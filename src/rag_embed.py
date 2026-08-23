@@ -18,14 +18,24 @@ Usage:
     python src/rag_embed.py
 """
 
+import os
 import time
 from pathlib import Path
+
 from langchain_chroma import Chroma
 from langchain_core.embeddings import Embeddings
+
 from rag_documents import build_driver_documents, build_race_documents, build_season_documents
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-CHROMA_DIR = PROJECT_ROOT / "data" / "chroma_db"
+# Same F1_FILES_DATA_DIR override as data_access.py — see that file's
+# comment for why. Keeps this working both as a dev script and as a
+# packaged Claude Desktop extension pointed at an external data folder.
+_env_data_dir = os.environ.get("F1_FILES_DATA_DIR")
+if _env_data_dir:
+    CHROMA_DIR = Path(_env_data_dir) / "chroma_db"
+else:
+    PROJECT_ROOT = Path(__file__).resolve().parent.parent
+    CHROMA_DIR = PROJECT_ROOT / "data" / "chroma_db"
 
 EMBEDDING_PROVIDER = "local"  # "local" or "gemini" — flip this when ready
 
@@ -53,7 +63,6 @@ def get_embeddings():
     if EMBEDDING_PROVIDER == "gemini":
         from langchain_google_genai import GoogleGenerativeAIEmbeddings
         return GoogleGenerativeAIEmbeddings(model=GEMINI_MODEL_NAME)
-
     from langchain_huggingface import HuggingFaceEmbeddings
     return HuggingFaceEmbeddings(
         model_name=LOCAL_MODEL_NAME,

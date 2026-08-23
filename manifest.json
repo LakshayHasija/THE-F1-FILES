@@ -1,0 +1,89 @@
+{
+  "manifest_version": "0.4",
+  "name": "the-f1-files",
+  "display_name": "THE-F1-FILES",
+  "version": "1.0.0",
+  "description": "F1 history via structured SQL tools and RAG-powered natural language Q&A (1950-2024).",
+  "long_description": "Combines structured SQL queries over the Ergast F1 dataset (standings, race results, qualifying, driver careers) with a RAG pipeline (Chroma + local embeddings + Groq) for open-ended natural-language questions about F1 history, grounded in retrieved context rather than the model's own training knowledge.",
+  "author": {
+    "name": "Lakshay Hasija",
+    "url": "https://lakshayhasija.github.io"
+  },
+  "server": {
+    "type": "uv",
+    "entry_point": "src/server.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "${__dirname}",
+        "${__dirname}/src/server.py"
+      ],
+      "env": {
+        "GROQ_API_KEY": "${user_config.groq_api_key}",
+        "F1_FILES_DATA_DIR": "${user_config.data_directory}"
+      }
+    }
+  },
+  "user_config": {
+    "groq_api_key": {
+      "type": "string",
+      "title": "Groq API Key",
+      "description": "Your Groq API key from console.groq.com — used by the ask_f1_question tool to generate answers.",
+      "sensitive": true,
+      "required": true
+    },
+    "data_directory": {
+      "type": "directory",
+      "title": "Project Data Folder",
+      "description": "Path to THE-F1-FILES 'data' folder (contains f1.db and chroma_db).",
+      "required": true,
+      "default": "C:/Users/hasij/OneDrive/Desktop/GitRepos/F1-Files/THE-F1-FILES/data"
+    }
+  },
+  "tools": [
+    {
+      "name": "driver_standings",
+      "description": "Get final or current F1 driver championship standings for a season"
+    },
+    {
+      "name": "constructor_standings",
+      "description": "Get final or current F1 constructor championship standings for a season"
+    },
+    {
+      "name": "race_calendar",
+      "description": "Get the full F1 race calendar for a season"
+    },
+    {
+      "name": "race_results",
+      "description": "Get the finishing classification for a specific F1 race"
+    },
+    {
+      "name": "qualifying_results",
+      "description": "Get qualifying results for a specific F1 race"
+    },
+    {
+      "name": "find_driver",
+      "description": "Search F1 drivers by partial name match"
+    },
+    {
+      "name": "driver_career_summary",
+      "description": "Get career totals (races, wins, podiums, points) for a driver"
+    },
+    {
+      "name": "ask_f1_question",
+      "description": "Answer open-ended natural-language questions about F1 history using RAG (semantic search + LLM generation)"
+    }
+  ],
+  "license": "MIT",
+  "compatibility": {
+    "claude_desktop": ">=1.0.0",
+    "platforms": [
+      "win32"
+    ],
+    "runtimes": {
+      "python": ">=3.11"
+    }
+  }
+}

@@ -1,5 +1,5 @@
 """
-THE-F1-FILES — Day 3: Data Access Layer
+THE-F1-FILES — Data Access Layer
 
 Thin, well-typed query functions over data/f1.db. These are the
 functions your FastMCP tools will wrap in a later milestone — so
@@ -10,12 +10,22 @@ Usage:
     python src/data_access.py   # runs a few sanity-check queries
 """
 
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DB_PATH = PROJECT_ROOT / "data" / "f1.db"
+# Normally the project root is two levels up from this file (src/ ->
+# project root). But when packaged as a Claude Desktop extension, this
+# file runs from an install directory that isn't the dev project folder
+# at all — F1_FILES_DATA_DIR lets the extension's manifest point at
+# wherever data/f1.db actually lives on the user's machine instead.
+_env_data_dir = os.environ.get("F1_FILES_DATA_DIR")
+if _env_data_dir:
+    DB_PATH = Path(_env_data_dir) / "f1.db"
+else:
+    PROJECT_ROOT = Path(__file__).resolve().parent.parent
+    DB_PATH = PROJECT_ROOT / "data" / "f1.db"
 
 def _connect():
     conn = sqlite3.connect(DB_PATH)

@@ -1,0 +1,13 @@
+[project]
+name = "the-f1-files-mcp-server"
+version = "1.0.0"
+description = "MCP server exposing structured F1 queries (SQLite) and RAG-powered natural language Q&A (Chroma + Groq) over F1 history, 1950-2024."
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp",
+    "langchain-core",
+    "langchain-groq",
+    "langchain-huggingface",
+    "langchain-chroma",
+    "sentence-transformers",
+]
